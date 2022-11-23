@@ -3,7 +3,7 @@
 #include <LiquidCrystal.h>
 
 //LiquidCrystal lcd(A5, A4, A3, A2, A1, A0);
-int sleep_ms=500;
+int sleep_ms=1000;
 int max_speed=100;
 const int stepPinS=8;
 const int dirPinS=9;
