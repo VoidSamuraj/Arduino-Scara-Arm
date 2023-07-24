@@ -1,11 +1,8 @@
 
-
 #include <stdlib.h>
 #include <string.h>
 #include <LiquidCrystal_I2C.h>
 
-//LiquidCrystal lcd(A5, A4, A3, A2, A1, A0);
-//LiquidCrystal lcd(A0, A1, A2, A3, A4, A5);
 LiquidCrystal_I2C lcd(0x27,16,4);
 
 int sleep_ms = 1000;
@@ -32,8 +29,6 @@ String text="Ready to work!";
 
 int allCommands=0;
 int processedCommands=0;
-
-
 
 byte zero[] = {
   B00000,
@@ -95,8 +90,6 @@ byte five[] = {
   B11111,
   B11111
 };
-
-
 
 void updateProgressBar(unsigned long count, unsigned long totalCount, int lineToPrintOn){
    int percent=count*100/totalCount;
