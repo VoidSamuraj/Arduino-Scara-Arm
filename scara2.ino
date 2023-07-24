@@ -1,7 +1,11 @@
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <LiquidCrystal_I2C.h>
 
+//LiquidCrystal lcd(A5, A4, A3, A2, A1, A0);
+//LiquidCrystal lcd(A0, A1, A2, A3, A4, A5);
 LiquidCrystal_I2C lcd(0x27,16,4);
 
 int sleep_ms = 1000;
@@ -28,6 +32,8 @@ String text="Ready to work!";
 
 int allCommands=0;
 int processedCommands=0;
+
+
 
 byte zero[] = {
   B00000,
@@ -90,13 +96,14 @@ byte five[] = {
   B11111
 };
 
+
+
 void updateProgressBar(unsigned long count, unsigned long totalCount, int lineToPrintOn){
    int percent=count*100/totalCount;
    int currentCol=0;
    lcd.clear();
    lcd.setCursor(currentCol,1);
    lcd.print("PRZETWORZONO");
-
    if(count>=totalCount){
       for(int i=0;i<=19;i++){
         lcd.setCursor(i,lineToPrintOn);
@@ -118,6 +125,15 @@ void updateProgressBar(unsigned long count, unsigned long totalCount, int lineTo
     }
  }
 
+long int getLong(String *splitStrings, int i ) {
+  int tsize = sizeof(splitStrings[i]) / sizeof(splitStrings[i][0]);
+  char tab [tsize];
+  strncpy(tab, &splitStrings[i][1], tsize);
+  long ret = strtol(tab, &eptr, 0);
+  if (splitStrings[i][1] == '-' && ret > 0)
+    ret *= -1;
+  return ret;
+}
 
 void setup() {
   Serial.begin(9600);
@@ -134,7 +150,8 @@ void setup() {
   pinMode(dirPinZ, OUTPUT);
   pinMode(enPinZ, OUTPUT);
 
-  lcd.begin();
+  lcd.init();
+  lcd.backlight();
   lcd.createChar(0, zero);
   lcd.createChar(1, one);
   lcd.createChar(2, two);
@@ -147,78 +164,79 @@ void setup() {
   delay(1000);
 }
 
-long int getLong(String *splitStrings, int i ) {
-  int tsize = sizeof(splitStrings[i]) / sizeof(splitStrings[i][0]);
-  char tab [tsize];
-  strncpy(tab, &splitStrings[i][1], tsize);
-  long ret = strtol(tab, &eptr, 0);
-  if (splitStrings[i][1] == '-' && ret > 0)
-    ret *= -1;
-  return ret;
-}
 void loop() {
   if (Serial.available()) {
-
+    
     // read the incoming byte:
     String str = Serial.readString(); //.toCharArray(line,50);
     startedSending=true;
+
     if (str == "START") {
       Serial.print("OK");
-     
-    } else {
-
+    }else if(str == "END"){
+       for(int i=0;i<=19;i++){
+        lcd.setCursor(i,2);
+        lcd.write(5);
+      }
+      delay(1000);
+      startedSending=false;
+    }else{
       int position = str.indexOf("START");
-      if (position != -1) {
+      while (position != -1) {
         String partBefore = str.substring(0, position);
         String partAfter = str.substring(position + 5);
       
         str = partBefore + partAfter;
+        position = str.indexOf("START");
       }
-      
-      int str_len = str.length() + 1;
 
-      // Prepare the character array (the buffer)
-      char line[str_len];
-
-      // Copy it over
-      str.toCharArray(line, str_len);
-
-      String splitStrings[5];
-      int i, j, cnt;
-      j = 0;
-      cnt = 0;
-      String command = strtok(line, " ");
-      while (command != 0)
-      {
-        splitStrings[cnt++] = command;
-        command = strtok(0, " ");
-      }
-      if(splitStrings[0]=="commands"){
-        allCommands=splitStrings[1].toInt();
-      }else if(allCommands!=0){
-
-      int motorSpeed = 10;
-      int moveS = 0;
-      int moveL = 0;
-      int moveZ = 0;
-      for (int i = cnt - 1; i >= 0; i--) {
-        long moved = getLong(splitStrings, i);
-        if (splitStrings[i][0] == 'F') {
-          motorSpeed = moved;
-        } else if (splitStrings[i][0] == 'L') {
-          moveL = moved;
-        } else if (splitStrings[i][0] == 'S') {
-          // delay(30);
-          moveS = moved;
-        } else if (splitStrings[i][0] == 'Z') {
-          moveZ = moved;
+      if(str!=""){
+        int str_len = str.length() + 1;
+  
+        // Prepare the character array (the buffer)
+        char line[str_len];
+  
+        // Copy it over
+        str.toCharArray(line, str_len);
+  
+        String splitStrings[5];
+        int i, j, cnt;
+        j = 0;
+        cnt = 0;
+        String command = strtok(line, " ");
+        while (command != 0)
+        {
+          splitStrings[cnt++] = command;
+          command = strtok(0, " ");
         }
-      }
-      ++processedCommands;
-      double alpha=moveL*9/35;
-      stopnieL+=alpha;
-      stopnieS+=(moveS*9/20+alpha+30/116)*25/116;
-      updateProgressBar(processedCommands,allCommands,2);
+        if(splitStrings[0]=="commands"){
+          allCommands=splitStrings[1].toInt();
+        }else if(allCommands!=0){
+  
+        int motorSpeed = 10;
+        int moveS = 0;
+        int moveL = 0;
+        int moveZ = 0;
+        for (int i = cnt - 1; i >= 0; i--) {
+          long moved = getLong(splitStrings, i);
+          if (splitStrings[i][0] == 'F') {
+            motorSpeed = moved;
+          } else if (splitStrings[i][0] == 'L') {
+            moveL = moved;
+          } else if (splitStrings[i][0] == 'S') {
+            // delay(30);
+            moveS = moved;
+          } else if (splitStrings[i][0] == 'Z') {
+            moveZ = moved;
+          }
+        }
+        ++processedCommands;
+        double alpha=moveL*9/35;
+        stopnieL+=alpha;
+        stopnieS+=(moveS*9/20+alpha+30/116)*25/116;
+        moveStepper(moveL,moveS,moveZ);
+        updateProgressBar(processedCommands,allCommands,2);
+        }
       }
       Serial.print("OK");
     }
