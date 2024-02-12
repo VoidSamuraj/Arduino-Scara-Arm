@@ -2,7 +2,7 @@
 #include <string.h>
 #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcd(0x27,16,2);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 int sleep_ms = 1000;
 int max_speed = 100;
@@ -18,86 +18,78 @@ const int stepPinZ = 2;
 const int dirPinZ = 3;
 const int enPinZ = 4;
 
-double stopnieL=90;
-double stopnieS=180;
+double stopnieL = 90;
+double stopnieS = 180;
 
 char *eptr;
-bool startedSending=false;
-int textPos=3;
-String text="Ready to work!";
+bool startedSending = false;
+int textPos = 3;
+String text = "Ready to work!";
 
-int allCommands=0;
-int processedCommands=0;
+int allCommands = 0;
+int processedCommands = 0;
 
-
-//bitmaps to draw percentage line
+// bitmaps to draw percentage line
 byte zero[] =
-{
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000
-};
+    {
+        B00000,
+        B00000,
+        B00000,
+        B00000,
+        B00000,
+        B00000,
+        B00000,
+        B00000};
 byte one[] =
-{
-    B10000,
-    B10000,
-    B10000,
-    B10000,
-    B10000,
-    B10000,
-    B10000,
-    B10000
-};
+    {
+        B10000,
+        B10000,
+        B10000,
+        B10000,
+        B10000,
+        B10000,
+        B10000,
+        B10000};
 byte two[] =
-{
-    B11000,
-    B11000,
-    B11000,
-    B11000,
-    B11000,
-    B11000,
-    B11000,
-    B11000
-};
+    {
+        B11000,
+        B11000,
+        B11000,
+        B11000,
+        B11000,
+        B11000,
+        B11000,
+        B11000};
 byte three[] =
-{
-    B11100,
-    B11100,
-    B11100,
-    B11100,
-    B11100,
-    B11100,
-    B11100,
-    B11100
-};
+    {
+        B11100,
+        B11100,
+        B11100,
+        B11100,
+        B11100,
+        B11100,
+        B11100,
+        B11100};
 byte four[] =
-{
-    B11110,
-    B11110,
-    B11110,
-    B11110,
-    B11110,
-    B11110,
-    B11110,
-    B11110
-};
+    {
+        B11110,
+        B11110,
+        B11110,
+        B11110,
+        B11110,
+        B11110,
+        B11110,
+        B11110};
 byte five[] =
-{
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111
-};
-
+    {
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111};
 
 void setup()
 {
@@ -131,22 +123,26 @@ void setup()
 
 void loop()
 {
-    //reading input
+    // reading input
     if (Serial.available())
     {
         // read the incoming byte:
         String str = Serial.readString();
-        startedSending=true;
         lcd.clear();
-        lcd.setCursor(0,0);
+        lcd.setCursor(0, 0);
         lcd.print(str);
 
-        //reply if communication started
-        if (str.indexOf("START") != -1)
+        // reply if communication started
+        if (str.indexOf("START") != -1){
             Serial.print("OK");
+            startedSending = true;
+        }
+        else if (str.indexOf("END") != -1){
+            startedSending = false;
+        }
         else
         {
-            str=removeSTART(str);
+            str = removeSTART(str);
             int str_len = str.length() + 1;
 
             // Prepare the character array (the buffer)
@@ -163,18 +159,20 @@ void loop()
             while (command != 0)
             {
                 splitStrings[cnt++] = command;
-                //continue from previous position
+                // continue from previous position
                 command = strtok(0, " ");
             }
-            if(splitStrings[0]=="commands")
-                allCommands=splitStrings[1].toInt();
-            else if(allCommands!=0)
+
+            int moveS = 0;
+            int moveL = 0;
+            int moveZ = 0;
+            if (splitStrings[0] == "commands")
+                allCommands = splitStrings[1].toInt();
+            else if (allCommands != 0)
             {
 
                 int motorSpeed = 10;
-                int moveS = 0;
-                int moveL = 0;
-                int moveZ = 0;
+
                 for (int i = cnt - 1; i >= 0; i--)
                 {
                     long moved = getLong(splitStrings, i);
@@ -187,39 +185,39 @@ void loop()
                     else if (splitStrings[i][0] == 'Z')
                         moveZ = moved;
                 }
-                ++processedCommands;
-                double alpha=moveL*9/35;
-                stopnieL+=alpha;
-                stopnieS+=(moveS*9/20+alpha+30/116)*25/116;
-                moveStepper(moveL, moveS, moveZ);
-                Serial.print("OK");
-                updateProgressBar(processedCommands,allCommands,1);
+                if (processedCommands < allCommands)
+                    ++processedCommands;
+
+                updateProgressBar(processedCommands, allCommands, 1);
             }
+            double alpha = moveL * 9 / 35;
+            stopnieL += alpha;
+            stopnieS += (moveS * 9 / 20 + alpha + 30 / 116) * 25 / 116;
+            moveStepper(moveL, moveS, moveZ);
+            Serial.print("OK");
         }
     }
-    else if(!startedSending)
+    else if (!startedSending)
     {
         lcd.clear();
-        lcd.setCursor(textPos,1);
-        if(textPos>6)
+        lcd.setCursor(textPos, 1);
+        if (textPos > 6)
         {
-            lcd.print(text.substring(0, 16-textPos));
-            lcd.setCursor(0,1);
-            lcd.print(text.substring(16-textPos,text.length()));
+            lcd.print(text.substring(0, 16 - textPos));
+            lcd.setCursor(0, 1);
+            lcd.print(text.substring(16 - textPos, text.length()));
         }
         else
             lcd.print(text);
         --textPos;
-        if(textPos==-1)
-            textPos=16;
+        if (textPos == -1)
+            textPos = 16;
         delay(700);
-        processedCommands=0;
+        processedCommands = 0;
     }
 
     delay(100);
 }
-
-
 
 void updateProgressBar(unsigned long count, unsigned long totalCount, int lineToPrintOn)
 {
@@ -236,7 +234,7 @@ void updateProgressBar(unsigned long count, unsigned long totalCount, int lineTo
             lcd.setCursor(i, lineToPrintOn);
             lcd.write(5);
         }
-        delay(1000);
+        delay(500);
         startedSending = false;
     }
     else
@@ -256,7 +254,6 @@ void updateProgressBar(unsigned long count, unsigned long totalCount, int lineTo
     }
 }
 
-
 long int getLong(String *splitStrings, int i)
 {
     int tsize = sizeof(splitStrings[i]) / sizeof(splitStrings[i][0]);
@@ -270,7 +267,7 @@ long int getLong(String *splitStrings, int i)
 
 /**
  * Remove 'START' strings from line and return it
-*/
+ */
 String removeSTART(String line)
 {
     int position = line.indexOf("START");
@@ -338,7 +335,7 @@ void moveStepper(int stepL, int stepS, int stepZ)
         maxScale = stepTML;
     if (maxScale < stepTMZ && stepTMZ != 0)
         maxScale = stepTMZ;
-  
+
     // how often need to make step
     if (stepTMS != 0)
         scaleS = maxScale / stepTMS;
