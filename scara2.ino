@@ -28,7 +28,8 @@ String text = "Ready to work!";
 
 int allCommands = 0;
 int processedCommands = 0;
-
+// variable that displays an animation when the input stream is empty twice in a row
+int canDisplayLoop=false;
 // bitmaps to draw percentage line
 byte zero[] = {
   B00000,
@@ -126,16 +127,19 @@ void loop() {
     // read the incoming byte:
     String str = Serial.readString();
     lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(str);
 
     // reply if communication started
     if (str.indexOf("START") != -1) {
       Serial.print("OK");
       startedSending = true;
+      lcd.setCursor(3, 0);
+      lcd.print("CONNECTED");
     } else if (str.indexOf("END") != -1) {
       startedSending = false;
     } else {
+      lcd.setCursor(3, 0);
+      lcd.print("PROCESSING");
+      canDisplayLoop=false;
       str = removeSTART(str);
       int str_len = str.length() + 1;
 
@@ -190,6 +194,7 @@ void loop() {
       Serial.print("OK");
     }
   } else if (!startedSending) {
+    if(canDisplayLoop){
     lcd.clear();
     lcd.setCursor(textPos, 1);
     if (textPos > 6) {
@@ -203,6 +208,8 @@ void loop() {
       textPos = 16;
     delay(700);
     processedCommands = 0;
+    }
+    canDisplayLoop=true;
   }
 
   delay(100);
