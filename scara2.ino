@@ -95,7 +95,6 @@ byte five[] = {
 void setup() {
   Serial.begin(115200);
   Serial.setTimeout(50);
-  
   pinMode(stepPinL, OUTPUT);
   pinMode(dirPinL, OUTPUT);
   pinMode(enPinL, OUTPUT);
@@ -127,10 +126,11 @@ void loop() {
   if (Serial.available()) {
     // read the incoming byte:
     String str = Serial.readString();
-    lcd.clear();
+
 
     // reply if communication started
     if (str.indexOf("START") != -1) {
+      lcd.clear();
       Serial.print("OK");
       startedSending = true;
       lcd.setCursor(3, 0);
@@ -138,8 +138,10 @@ void loop() {
     } else if (str.indexOf("END") != -1) {
       startedSending = false;
     } else {
-      lcd.setCursor(3, 0);
-      lcd.print("PROCESSING");
+      if(allCommands==0){
+        lcd.setCursor(3, 0);
+        lcd.print("PROCESSING");
+      }
       canDisplayLoop=false;
       str = removeSTART(str);
       int str_len = str.length() + 1;
@@ -186,6 +188,10 @@ void loop() {
       if (allCommands != 0) {
         if (processedCommands < allCommands)
           ++processedCommands;
+        else{
+          allCommands=0;
+          processedCommands=0;
+        }  
         updateProgressBar(processedCommands, allCommands, 1);
       }
       double alpha = moveL * 9 / 35;
@@ -219,9 +225,7 @@ void loop() {
 void updateProgressBar(unsigned long count, unsigned long totalCount, int lineToPrintOn) {
   int percent = count * 100 / totalCount;
   int currentCol = 0;
-  lcd.clear();
   lcd.setCursor(currentCol, 1);
-  lcd.print("PRZETWORZONO");
 
   if (count >= totalCount) {
     for (int i = 0; i <= 19; i++) {
