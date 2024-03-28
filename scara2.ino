@@ -18,6 +18,10 @@ const int stepPinZ = 2;
 const int dirPinZ = 3;
 const int enPinZ = 4;
 
+const int endstopPinL = 11;
+const int endstopPinS = 12;
+const int endstopPinZ = 13;
+
 double stopnieL = 90;
 double stopnieS = 180;
 
@@ -92,6 +96,18 @@ byte five[] = {
   B11111
 };
 
+enum Status {
+  SUCCESS,
+  ENDSTOP_L_N,
+  ENDSTOP_L_P,
+  ENDSTOP_S_N,
+  ENDSTOP_S_P,
+  ENDSTOP_Z_N,
+  ENDSTOP_Z_P
+};
+// values of endstops
+bool whichEndstopPressed[6] = {false, false, false, false, false, false};
+
 void setup() {
   Serial.begin(115200);
   Serial.setTimeout(50);
@@ -106,6 +122,11 @@ void setup() {
   pinMode(stepPinZ, OUTPUT);
   pinMode(dirPinZ, OUTPUT);
   pinMode(enPinZ, OUTPUT);
+
+  pinMode(endstopPinL, INPUT_PULLUP);
+  pinMode(endstopPinS, INPUT_PULLUP);
+  pinMode(endstopPinZ, INPUT_PULLUP);
+
 
   lcd.begin();
   lcd.createChar(0, zero);
@@ -197,8 +218,30 @@ void loop() {
       double alpha = moveL * 9 / 35;
       stopnieL += alpha;
       stopnieS += (moveS * 9 / 20 + alpha + 30 / 116) * 25 / 116;
-      moveStepper(moveL, moveS, moveZ);
-      Serial.print("OK");
+      Status status = moveStepper(moveL, moveS, moveZ, true);
+      switch (status) {
+        case Status::SUCCESS:
+            Serial.print("OK");
+            break;
+        case Status::ENDSTOP_L_N:
+            Serial.print("ENDSTOP_L_N");
+            break;
+        case Status::ENDSTOP_L_P:
+            Serial.print("ENDSTOP_L_P");
+            break;
+        case Status::ENDSTOP_S_N:
+            Serial.print("ENDSTOP_S_N");
+            break;
+        case Status::ENDSTOP_S_P:
+            Serial.print("ENDSTOP_S_P");
+            break;
+        case Status::ENDSTOP_Z_N:
+            Serial.print("ENDSTOP_Z_N");
+            break;
+        case Status::ENDSTOP_Z_P:
+            Serial.print("ENDSTOP_Z_P");
+            break;
+      }
     }
   } else if (!startedSending) {
     if(canDisplayLoop){
@@ -273,7 +316,15 @@ String removeSTART(String line) {
   return line;
 }
 
-void moveStepper(int stepL, int stepS, int stepZ) {
+/**
+*Function to move stepper motor
+* @param stepL - steps of arm connected to base
+* @param stepS - steps of arm connected to tool
+* @param stepL - steps of Z axis
+* @param secure - bool value if use endstops
+* @return Status - result of moving arm/ interruptions
+*/
+Status moveStepper(int stepL, int stepS, int stepZ, bool secure) {
   int stepTMS = stepS;
   int stepTML = stepL;
   int stepTMZ = stepZ;
@@ -353,6 +404,17 @@ void moveStepper(int stepL, int stepS, int stepZ) {
       changeZ = true;
 
     if (changeS) {
+      if(digitalRead(endstopPinS) == LOW && secure){
+          if(stepS>0 && !whichEndstopPressed[2]){
+            whichEndstopPressed[3]=true;
+            return Status::ENDSTOP_S_P;
+          }else if(stepS<0 && !whichEndstopPressed[3]){  
+            whichEndstopPressed[2]=true;
+            return Status::ENDSTOP_S_N;   
+          }   
+      }
+      whichEndstopPressed[2]=false;
+      whichEndstopPressed[3]=false;
       digitalWrite(stepPinS, !digitalRead(stepPinS));
       delayMicroseconds(sleep_ms);
       digitalWrite(stepPinS, !digitalRead(stepPinS));
@@ -360,13 +422,35 @@ void moveStepper(int stepL, int stepS, int stepZ) {
       ++liczS;
     }
     if (changeL) {
+      if(digitalRead(endstopPinL) == LOW && secure){
+          if(stepL>0 && !whichEndstopPressed[0]){
+            whichEndstopPressed[1]=true;
+            return Status::ENDSTOP_L_P;
+          }else if(stepL<0 && !whichEndstopPressed[1]){  
+            whichEndstopPressed[0]=true;
+            return Status::ENDSTOP_L_N;      
+          }
+      }
+      whichEndstopPressed[0]=false;
+      whichEndstopPressed[1]=false;
       digitalWrite(stepPinL, !digitalRead(stepPinL));
       delayMicroseconds(sleep_ms);
       digitalWrite(stepPinL, !digitalRead(stepPinL));
       ++currentStepL;
       ++liczL;
     }
-    if (changeZ) {
+    if (changeZ) {      
+      if(digitalRead(endstopPinZ) == LOW && secure){
+          if(stepZ>0 && !whichEndstopPressed[4]){
+            whichEndstopPressed[5]=true;
+            return Status::ENDSTOP_Z_P;
+          }else if(stepZ<0 && !whichEndstopPressed[5]){  
+            whichEndstopPressed[4]=true;
+            return Status::ENDSTOP_Z_N;      
+          }
+      }
+      whichEndstopPressed[4]=false;
+      whichEndstopPressed[5]=false;
       digitalWrite(stepPinZ, !digitalRead(stepPinZ));
       delayMicroseconds(sleep_ms);
       digitalWrite(stepPinZ, !digitalRead(stepPinZ));
@@ -376,4 +460,5 @@ void moveStepper(int stepL, int stepS, int stepZ) {
     delayMicroseconds(sleep_ms);
     ++iter;
   }
+  return Status::SUCCESS;
 }
