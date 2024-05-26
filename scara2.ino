@@ -4,8 +4,9 @@
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int min_delay = 5;
-int max_delay = 15;
+const int min_delay = 8;
+const int max_delay = 30;
+const int steps=40;
 
 int max_speed = 100;
 const int stepPinS = 8;
@@ -400,10 +401,31 @@ Status moveStepperSmooth(int stepL, int stepS, int stepZ, bool secure){
     // interpolation
     
     int delayMS;
+  
+  /*
     if (iter < maxScale / 2)
       delayMS = (int)(max_delay - (iter / (maxScale / 2) * (max_delay - min_delay)));
     else
       delayMS = (int)(min_delay + ((iter - maxScale / 2) / (maxScale / 2) * (max_delay - min_delay)));
+*/
+
+
+  if(iter<=steps)
+    delayMS = (int)(max_delay - (iter / steps * (max_delay - min_delay)));
+  else if(maxScale-steps<iter)
+    delayMS = (int)(min_delay + ((maxScale-iter)/steps* (max_delay - min_delay)));
+  else
+    delayMS = min_delay;
+
+/*
+    if (iter < maxScale / 2)
+      delayMS = (int)max(min_delay, max_delay-(pow(iter/maxScale/4,2) *(max_delay-min_delay)));
+    else
+      delayMS =min(max_delay,min_delay+(pow(iter/maxScale/4,2)*(max_delay-min_delay)));
+*/
+
+
+
    /* 
   int delayMS;
   if (iter < maxScale / 2) {
