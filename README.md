@@ -1,4 +1,4 @@
-# Arduino-Scara-Arm
+# Arduino Scara Arm
 This is code made to control a simple SCARA arm for arduino. The project uses an Arduino UNO. For now, that is enough, but it may be insufficient for advanced tools because of the small number of ports. It communicates with my <a href="https://github.com/VoidSamuraj/ScaraArm" target="_blank">server</a> via serial port. It controls three stepper motors connected to the TB6600 driver.
 There are 3 endstops that will notify server.
 
