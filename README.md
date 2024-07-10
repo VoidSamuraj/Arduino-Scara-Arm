@@ -42,4 +42,4 @@ There are 3 endstops that will notify server.
   
 ## License
 
-Distributed under the GNU License. See `LICENSE.txt` for more information.
+Distributed under the GNU License. See <a href="https://github.com/VoidSamuraj/Arduino-Scara-Arm/blob/main/LICENSE">`LICENSE`</a> for more information.
