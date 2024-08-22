@@ -4,7 +4,7 @@
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-const int min_delay = 8;
+const int min_delay = 3;
 const int max_delay = 30;
 const int steps=40;
 
@@ -28,11 +28,15 @@ const int endstopPinZ = 13;
 double stopnieL = 90;
 double stopnieS = 180;
 
+int interpolationSteps = 10;
+
 char *eptr;
 bool startedSending = false;
 int textPos = 3;
 String text = "Ready to work!";
 
+bool interpolateIn = true;
+bool interpolateOut = false;
 int allCommands = 0;
 int processedCommands = 0;
 // variable that displays an animation when the input stream is empty twice in a row
@@ -201,8 +205,9 @@ void loop()
 
       for (int i = cnt - 1; i >= 0; i--)
       {
-
-        long moved = getLong(splitStrings, i);
+        lcd.setCursor(1, 0);
+        lcd.print(splitStrings[i]);
+        long moved = getLong(&splitStrings[i], i); //do i need to parse reference?
         if (splitStrings[i][0] == 'F')
           motorSpeed = moved;
         else if (splitStrings[i][0] == 'L')
@@ -211,6 +216,10 @@ void loop()
           moveS = moved;
         else if (splitStrings[i][0] == 'Z')
           moveZ = moved;
+        else if (splitStrings[i][0] == 'I')
+          interpolateIn = moved == 1; 
+        else if (splitStrings[i][0] == 'O')
+          interpolateOut = moved == 1;
       }
 
       if (allCommands != 0)
@@ -224,34 +233,38 @@ void loop()
         }
         updateProgressBar(processedCommands, allCommands, 1);
       }
-      double alpha = moveL * 9 / 35;
-      stopnieL += alpha;
-      stopnieS += (moveS * 9 / 20 + alpha + 30 / 116) * 25 / 116;
-      Status status = moveStepperSmooth(moveL, moveS, moveZ, true);
-      switch (status)
-      {
-      case Status::SUCCESS:
+      if(moveL != 0 || moveS != 0 || moveZ != 0){
+        double alpha = moveL * 9 / 35;
+        stopnieL += alpha;
+        stopnieS += (moveS * 9 / 20 + alpha + 30 / 116) * 25 / 116;
+        Status status = moveStepperSmooth(moveL, moveS, moveZ);
+        switch (status)
+        {
+        case Status::SUCCESS:
+          Serial.print("OK");
+          break;
+        case Status::ENDSTOP_L_N:
+          Serial.print("ENDSTOP_L_N");
+          break;
+        case Status::ENDSTOP_L_P:
+          Serial.print("ENDSTOP_L_P");
+          break;
+        case Status::ENDSTOP_S_N:
+          Serial.print("ENDSTOP_S_N");
+          break;
+        case Status::ENDSTOP_S_P:
+          Serial.print("ENDSTOP_S_P");
+          break;
+        case Status::ENDSTOP_Z_N:
+          Serial.print("ENDSTOP_Z_N");
+          break;
+        case Status::ENDSTOP_Z_P:
+          Serial.print("ENDSTOP_Z_P");
+          break;
+        }
+      }else
         Serial.print("OK");
-        break;
-      case Status::ENDSTOP_L_N:
-        Serial.print("ENDSTOP_L_N");
-        break;
-      case Status::ENDSTOP_L_P:
-        Serial.print("ENDSTOP_L_P");
-        break;
-      case Status::ENDSTOP_S_N:
-        Serial.print("ENDSTOP_S_N");
-        break;
-      case Status::ENDSTOP_S_P:
-        Serial.print("ENDSTOP_S_P");
-        break;
-      case Status::ENDSTOP_Z_N:
-        Serial.print("ENDSTOP_Z_N");
-        break;
-      case Status::ENDSTOP_Z_P:
-        Serial.print("ENDSTOP_Z_P");
-        break;
-      }
+
     }
   }
   else if (!startedSending)
@@ -350,7 +363,7 @@ String removeSTART(String line)
  * @return Status - result of moving arm/ interruptions
  */
 
-Status moveStepperSmooth(int stepL, int stepS, int stepZ, bool secure){
+Status moveStepperSmooth(int stepL, int stepS, int stepZ){
 
   int stepTMS = stepS;
   int stepTML = stepL;
@@ -400,7 +413,7 @@ Status moveStepperSmooth(int stepL, int stepS, int stepZ, bool secure){
 
     // interpolation
     
-    int delayMS;
+    int delayMS=min_delay;
   
   /*
     if (iter < maxScale / 2)
@@ -409,13 +422,25 @@ Status moveStepperSmooth(int stepL, int stepS, int stepZ, bool secure){
       delayMS = (int)(min_delay + ((iter - maxScale / 2) / (maxScale / 2) * (max_delay - min_delay)));
 */
 
-
+/*
   if(iter<=steps)
     delayMS = (int)(max_delay - (iter / steps * (max_delay - min_delay)));
   else if(maxScale-steps<iter)
     delayMS = (int)(min_delay + ((maxScale-iter)/steps* (max_delay - min_delay)));
   else
     delayMS = min_delay;
+*/
+
+//turn on interpolation if flag is turned on & min 3 steps
+if(stepTMS>2 && stepTML>2 && stepTMZ>2){
+  if (interpolateIn && iter <= interpolationSteps) {
+      // Interpolacja na początku
+      delayMS = (int)max(min_delay, max_delay - (pow(double(iter) / interpolationSteps, 2) * (max_delay - min_delay)));
+  } else if (interpolateOut && iter >= maxScale - interpolationSteps) {
+      // Interpolacja na końcu
+      delayMS = (int)min(max_delay, min_delay + (pow(double(iter - (maxScale - interpolationSteps)) / interpolationSteps, 2) * (max_delay - min_delay)));
+  } 
+}
 
 /*
     if (iter < maxScale / 2)
@@ -436,11 +461,10 @@ Status moveStepperSmooth(int stepL, int stepS, int stepZ, bool secure){
     delayMS = (int)(min_delay + fraction * fraction * (max_delay - min_delay));
   }
 */
-    if(secure){
-      Status endstopState= checkEndstops(endstopPinL, endstopPinS, endstopPinZ, stepL, stepS, stepZ);
-      if(endstopState != Status::SUCCESS){
-        return endstopState;
-      }
+
+    Status endstopState= checkEndstops(endstopPinL, endstopPinS, endstopPinZ, stepL, stepS, stepZ);
+    if(endstopState != Status::SUCCESS){
+      return endstopState;
     }
 
     // move motors one step
